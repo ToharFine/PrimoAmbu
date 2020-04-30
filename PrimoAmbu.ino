@@ -1,6 +1,7 @@
 #include <Servo.h>
 #include <Filter.h>
 #include <math.h>
+#include <Timer.h>
 /////////////////////////
 //ports:
 int digital_limit_port = 9;
@@ -14,24 +15,27 @@ int dial_port = 5;
 //constants:
 int SPARK_TO_LOW = 1540;
 int SPARK_TO_HIGH = 2000;
-float manual_speed = 15;
+float manual_speed = 80;
 /////////////////////////
 Servo beltMotor; //A delay of 1000 Microseconds is Full Reverse, A delay of 1000 to 1460 Microseconds is Proportional Reverse, A delay of 1460 to 1540 Microseconds is neutral ,A delay of 1540 to 2000 Microseconds is Proportional Forward, A delay of 2000 Microseconds is Full Forward
 
+Timer t;
+int currentSec = 0;
 int prev;
-Moving_average shaftPositionFilter(20, 0);
+Moving_average shaftPositionFilter(5 , 0);
 int shaftPosition = 0;
-Moving_average shaftLimitFilter(10, 0);
+Moving_average shaftLimitFilter(1, 0);
 boolean shaftLimit = false;
-boolean changedValue = false;
+boolean changedValueEncoder = false, changedValueLimit = false;
 
-Moving_average button1Filter(70, 0);
+Moving_average button1Filter(50, 0);
 Moving_average button2Filter(50, 0);
-Moving_average button3Filter(50, 0);
+Moving_average button3Filter(10, 0);
 Moving_average dialFilter(10, 0);
 
-int movingDistance = 0;
 int num;
+
+int movingDistance = 0;
 float motorSpeed = 0;
 float waitingTime = 500;
 
@@ -57,6 +61,13 @@ void setup() {
 
 void loop() {
   if(isCalibrating){
+    if(!isWaiting && getShaftLimit()){
+      setMotorSpeed(0);
+      delay(500);
+      isWaiting = true;
+      }
+      if(!getShaftLimit())
+        isWaiting = false; 
     if(getButton1()&&getButton2()){
       motorSpeed = 0;
     } else if(getButton1()){
@@ -74,20 +85,24 @@ void loop() {
   } else{
     if(getButton1()){
       waitingTime = fmax(200, waitingTime - 100);
+      delay(1);
     }
     if(getButton2()){
       waitingTime = fmin(1500, waitingTime + 100);
+      setMotorSpeed(0);
+      delay(1);
     }
     if(dir){
       motorSpeed = manual_speed;
     } else{
       motorSpeed = -manual_speed;
     }
-    if(shaftPosition >= getDial() + movingDistance && isWaiting)
+    if((shaftPosition >= getDial() + movingDistance && isWaiting) || getShaftLimit() )
     {dir = false;
     setMotorSpeed(0);
     delay(waitingTime);
     isWaiting = false;
+    shaftPosition = movingDistance + getDial();
     } else if(!dir && shaftPosition <= movingDistance){
       dir = true;
       setMotorSpeed(0);
@@ -118,8 +133,22 @@ boolean getButton2(){
 }
 
 boolean getButton3(){
-  return 1 == button3Filter.filter(digitalRead(button_3_port));  
+ return 1 == button3Filter.filter(digitalRead(button_3_port));  
 }
+
+boolean getShaftLimit() {
+
+  boolean flag = digitalRead(digital_limit_port); //shaftLimitFilter.filter(digitalRead(digital_limit_port));
+//  if(flag && changedValueLimit)
+//    {currentSec = millis();
+//    changedValueLimit = false;
+//    }
+//   if(millis() - currentSec < 200)
+//    flag = false;
+//   else 
+//    changedValueLimit = true;
+  return flag;
+  }
 
 int getEncoderPosition(){
   return shaftPosition;
@@ -137,13 +166,13 @@ void updateEncoderPosition(){
 //    changedValue = true;
 //    }
 
-  if(prev != shaftPositionFilter.filter(digitalRead(digital_encoder_port))){
+  if(prev != digitalRead(digital_encoder_port)){
       if(motorSpeed > 0)
       ++shaftPosition;
       else if(motorSpeed < 0)
       --shaftPosition;
 }
-prev = shaftPositionFilter.filter(digitalRead(digital_encoder_port));
+prev = digitalRead(digital_encoder_port);
   }
 
 void updateInputs(){
@@ -153,7 +182,6 @@ void updateInputs(){
   getDial();
   updateEncoderPosition();
   
-  Serial.println(getEncoderPosition());
 }
 
 void setMotorSpeed(float speed){
