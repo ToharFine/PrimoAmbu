@@ -63,12 +63,15 @@ void loop() {
   if(isCalibrating){
     //the calibration mode
     if(!isWaiting && getShaftLimit()){
+      //stops the motor for a bit if it touches the shaftLimit Sensor, so its easy to calibrate
       setMotorSpeed(0);
       delay(500);
       isWaiting = true;
       }
-      if(!getShaftLimit())
-        isWaiting = false; 
+      
+    if(!getShaftLimit())
+      isWaiting = false;
+       
     if(getButton1()&&getButton2()){
       motorSpeed = 0;
     } else if(getButton1()){
@@ -83,6 +86,11 @@ void loop() {
     if(movingDistance >= 0)
     {
       dir = false;
+    }
+
+    if(getButton3Realese() && motorSpeed == 0){
+      isCalibrating = false;
+      delay(500);
     }
   } // end of calibration code
   // the "running mode" code
@@ -108,6 +116,12 @@ void loop() {
       delay(waitingTime);
       isWaiting = true;
       }
+
+      if(getButton3Realese()){
+      isCalibrating = true;
+      setMotorSpeed(0);
+      delay(500);
+    }
   }
   // end of running mode code
   
@@ -197,7 +211,7 @@ void updateEncoderPosition(){
       --shaftPosition;
 }
 prev = digitalRead(digital_encoder_port);
-  }
+}
 
 void updateInputs(){
   getButton1();
