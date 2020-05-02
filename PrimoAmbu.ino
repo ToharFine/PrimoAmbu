@@ -215,8 +215,11 @@ prev = digitalRead(digital_encoder_port);
 
 void updateInputs(){
   getButton1();
+  getButton1Realese();
   getButton2();
+  getButton2Realese();
   getButton3();
+  getButton3Realese();
   getDial();
   updateEncoderPosition();
   
