@@ -1,7 +1,5 @@
 #include <Servo.h>
 #include <Filter.h>
-#include <math.h>
-#include <Timer.h>
 /////////////////////////
 //ports:
 int digital_limit_port = 9;
@@ -18,8 +16,6 @@ int SPARK_TO_HIGH = 2000;
 float manual_speed = 80;
 /////////////////////////
 Servo beltMotor; //A delay of 1000 Microseconds is Full Reverse, A delay of 1000 to 1460 Microseconds is Proportional Reverse, A delay of 1460 to 1540 Microseconds is neutral ,A delay of 1540 to 2000 Microseconds is Proportional Forward, A delay of 2000 Microseconds is Full Forward
-
-Timer t;
 int currentSec = 0;
 int prev;
 Moving_average shaftPositionFilter(5 , 0);
@@ -28,12 +24,15 @@ Moving_average shaftLimitFilter(1, 0);
 boolean shaftLimit = false;
 boolean changedValueEncoder = false, changedValueLimit = false;
 
+boolean prevButton1 = false;
+boolean prevButton2 = false;
+boolean prevButton3 = false;
+
+
 Moving_average button1Filter(50, 0);
 Moving_average button2Filter(50, 0);
 Moving_average button3Filter(10, 0);
 Moving_average dialFilter(10, 0);
-
-int num;
 
 int movingDistance = 0;
 float motorSpeed = 0;
@@ -60,7 +59,9 @@ void setup() {
 }
 
 void loop() {
+  
   if(isCalibrating){
+    //the calibration mode
     if(!isWaiting && getShaftLimit()){
       setMotorSpeed(0);
       delay(500);
@@ -80,29 +81,27 @@ void loop() {
       }
     movingDistance = shaftPosition;
     if(movingDistance >= 0)
-    {dir = false;
+    {
+      dir = false;
     }
-  } else{
-    if(getButton1()){
+  } // end of calibration code
+  // the "running mode" code
+  else{
+    if(getButton1Realese()){
       waitingTime = fmax(200, waitingTime - 100);
-      delay(1);
     }
-    if(getButton2()){
+    if(getButton2Realese()){
       waitingTime = fmin(1500, waitingTime + 100);
+    }
+
+    motorSpeed = dir? manual_speed : -manual_speed;
+   
+    if((shaftPosition >= getDial() + movingDistance && isWaiting) || getShaftLimit()) {
+      dir = false;
       setMotorSpeed(0);
-      delay(1);
-    }
-    if(dir){
-      motorSpeed = manual_speed;
-    } else{
-      motorSpeed = -manual_speed;
-    }
-    if((shaftPosition >= getDial() + movingDistance && isWaiting) || getShaftLimit() )
-    {dir = false;
-    setMotorSpeed(0);
-    delay(waitingTime);
-    isWaiting = false;
-    shaftPosition = movingDistance + getDial();
+      delay(waitingTime);
+      isWaiting = false;
+      shaftPosition = movingDistance + getDial();
     } else if(!dir && shaftPosition <= movingDistance){
       dir = true;
       setMotorSpeed(0);
@@ -110,62 +109,87 @@ void loop() {
       isWaiting = true;
       }
   }
-  if(getButton3()){
-    isCalibrating = !isCalibrating;
-    delay(500);
-  }
+  // end of running mode code
   
   updateInputs();
   setMotorSpeed(motorSpeed);
 }
 
 
+boolean getShaftLimit() {
+  boolean flag = digitalRead(digital_limit_port); //shaftLimitFilter.filter(digitalRead(digital_limit_port));
+  return flag;
+  }
+
+  
+void setMotorSpeed(float speed){
+  if(speed >= 0){
+    beltMotor.writeMicroseconds(map(speed, 0, 100, SPARK_TO_LOW, SPARK_TO_HIGH));
+  }
+  else{
+    beltMotor.writeMicroseconds(map(100+speed, 0, 100, 1000, 1460));
+  }
+}
+
 float getDial(){
   return map(dialFilter.filter(analogRead(dial_port)), 0, 1023, 3, 18);
 }
 
+
 boolean getButton1(){
   return 1 == button1Filter.filter(digitalRead(button_1_port));  
+}
+
+boolean getButton1Realese() {
+  boolean b1 = getButton1();
+  if(!b1 && prevButton1)
+  {
+    prevButton1 = b1;
+    return true;
+  } else {
+    prevButton1 = b1;
+    return false;
+  }
 }
 
 boolean getButton2(){
   return 1 == button2Filter.filter(digitalRead(button_2_port));  
 }
 
+
+boolean getButton2Realese() {
+  boolean b2 = getButton2();
+  if(!b2 && prevButton2)
+  {
+    prevButton2 = b2;
+    return true;
+  } else {
+    prevButton2 = b2;
+    return false;
+  }
+}
+
 boolean getButton3(){
  return 1 == button3Filter.filter(digitalRead(button_3_port));  
 }
 
-boolean getShaftLimit() {
-
-  boolean flag = digitalRead(digital_limit_port); //shaftLimitFilter.filter(digitalRead(digital_limit_port));
-//  if(flag && changedValueLimit)
-//    {currentSec = millis();
-//    changedValueLimit = false;
-//    }
-//   if(millis() - currentSec < 200)
-//    flag = false;
-//   else 
-//    changedValueLimit = true;
-  return flag;
+boolean getButton3Realese() {
+  boolean b3 = getButton3();
+  if(!b3 && prevButton3)
+  {
+    prevButton3 = b3;
+    return true;
+  } else {
+    prevButton3 = b3;
+    return false;
   }
+}
 
 int getEncoderPosition(){
   return shaftPosition;
 }
 
 void updateEncoderPosition(){
-//    if(changedValue){
-//    if(shaftPositionFilter.filter(digitalRead(digital_encoder_port))){
-//      if(motorSpeed > 0)
-//      ++shaftPosition;
-//      else if(motorSpeed < 0)
-//      --shaftPosition;
-//      changedValue = false;}}
-//    if(!digitalRead(6)){
-//    changedValue = true;
-//    }
-
   if(prev != digitalRead(digital_encoder_port)){
       if(motorSpeed > 0)
       ++shaftPosition;
@@ -182,13 +206,4 @@ void updateInputs(){
   getDial();
   updateEncoderPosition();
   
-}
-
-void setMotorSpeed(float speed){
-  if(speed >= 0){
-    beltMotor.writeMicroseconds(map(speed, 0, 100, SPARK_TO_LOW, SPARK_TO_HIGH));
-  }
-  else{
-    beltMotor.writeMicroseconds(map(100+speed, 0, 100, 1000, 1460));
-  }
 }
