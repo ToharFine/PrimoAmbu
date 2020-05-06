@@ -96,10 +96,10 @@ void loop() {
   // the "running mode" code
   else{
     if(getButton1Realese()){
-      waitingTime = fmax(200, waitingTime - 100);
+      waitingTime = fmax(200, waitingTime - 300);
     }
     if(getButton2Realese()){
-      waitingTime = fmin(1500, waitingTime + 100);
+      waitingTime = fmin(1500, waitingTime + 300);
     }
 
     motorSpeed = dir? manual_speed : -manual_speed;
@@ -132,6 +132,7 @@ void loop() {
 
 boolean getShaftLimit() {
   boolean flag = digitalRead(digital_limit_port); //shaftLimitFilter.filter(digitalRead(digital_limit_port));
+  Serial.println(flag);
   return flag;
   }
 
@@ -169,7 +170,6 @@ boolean getButton1Realese() {
 boolean getButton2(){
   return 1 == button2Filter.filter(digitalRead(button_2_port));  
 }
-
 
 boolean getButton2Realese() {
   boolean b2 = getButton2();
