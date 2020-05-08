@@ -42,7 +42,7 @@ boolean isCalibrating;
 boolean dir = true;
 boolean isWaiting = false;
 /////////////////////////
-
+// before the loop:
 void setup() {
   beltMotor.attach(belt_motor_port);
 
